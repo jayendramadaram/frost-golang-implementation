@@ -4,6 +4,7 @@ package sigag
 import (
 	"context"
 	"frost/internal/sigag/epoch"
+	"frost/internal/sigag/rpc"
 	"frost/pkg/collections"
 	"frost/pkg/partyclient"
 	"time"
@@ -30,8 +31,7 @@ func (s *sigag) StartSignatureAggregator(ctx context.Context, intialTick time.Du
 	peerIpList := collections.NewOrderedList[partyclient.PartyClient]()
 
 	errs.Go(func() error {
-		// some func returns err
-		return nil
+		return rpc.NewServer(peerIpList, s.logger).Run(s.port)
 	})
 
 	if err := epoch.NewEpochRunner(peerIpList, intialTick, s.logger).Run(); err != nil {

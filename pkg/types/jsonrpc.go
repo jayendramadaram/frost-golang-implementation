@@ -2,18 +2,36 @@ package types
 
 import (
 	"encoding/json"
+	"net/http"
+)
+
+const (
+	// Version is JSON-RPC 2.0.
+	Version = "2.0"
+
+	BatchRequestKey  = '['
+	ContentTypeKey   = "Content-Type"
+	ContentTypeValue = "application/json"
 )
 
 type ErrCode int
 
 const (
-	ErrCodeParseError ErrCode = iota
+	ErrDefault ErrCode = iota
 
 	RpcParseError     ErrCode = -32700
 	RpcInvalidRequest ErrCode = -32600
 	RpcMethodNotFound ErrCode = -32601
 	RpcInvalidParams  ErrCode = -32602
 )
+
+var ErrToStatusCode = map[ErrCode]int{
+	ErrDefault:        http.StatusInternalServerError,
+	RpcParseError:     http.StatusInternalServerError,
+	RpcInvalidRequest: http.StatusBadRequest,
+	RpcMethodNotFound: http.StatusNotFound,
+	RpcInvalidParams:  http.StatusBadRequest,
+}
 
 type JSONError struct {
 	Code    int             `json:"code"`
@@ -49,5 +67,12 @@ func NewErrorResp(ID interface{}, err error, errCode ErrCode) *JSONResponse {
 			Code:    int(errCode),
 			Message: err.Error(),
 		},
+	}
+}
+
+func NewResponse(r *JSONRequest) *JSONResponse {
+	return &JSONResponse{
+		JSONRPC: Version,
+		ID:      r.ID,
 	}
 }
