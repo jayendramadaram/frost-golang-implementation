@@ -1,8 +1,8 @@
 package epoch
 
 import (
+	"frost/internal/party/partyclient"
 	"frost/pkg/collections"
-	"frost/pkg/partyclient"
 	"time"
 
 	"go.uber.org/zap"

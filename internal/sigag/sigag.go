@@ -3,10 +3,10 @@ package sigag
 
 import (
 	"context"
+	"frost/internal/party/partyclient"
 	"frost/internal/sigag/epoch"
 	"frost/internal/sigag/rpc"
 	"frost/pkg/collections"
-	"frost/pkg/partyclient"
 	"time"
 
 	"go.uber.org/zap"

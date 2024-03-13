@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"frost/internal/party/partyclient"
 	"frost/pkg/collections"
-	"frost/pkg/partyclient"
 	"frost/pkg/rpc"
+	"net"
 	"reflect"
 	"strings"
 
@@ -23,7 +24,9 @@ type server struct {
 
 type Server interface {
 	Run(port string) error
-	RegisterParty(_ context.Context, params *json.RawMessage) (any, error)
+	Register(_ context.Context, params *json.RawMessage) (bool, error)
+	Health(_ context.Context, params *json.RawMessage) (any, error)
+	GetParties(_ context.Context, params *json.RawMessage) (Parties, error)
 }
 
 func NewServer(peerIpList *collections.OrderedList[partyclient.PartyClient], logger *zap.Logger) Server {
@@ -54,7 +57,10 @@ func (s *server) Run(port string) error {
 
 		handler := func(c context.Context, params *json.RawMessage) (any, error) {
 			result := method.Func.Call([]reflect.Value{reflect.ValueOf(s), reflect.ValueOf(c), reflect.ValueOf(params)})
-			return result[0].Interface(), result[1].Interface().(error)
+			if result[1].IsNil() {
+				return result[0].Interface(), nil
+			}
+			return result[0], result[1].Interface().(error)
 		}
 
 		if err := mr.RegisterMethod(methodName, handler); err != nil {
@@ -65,19 +71,17 @@ func (s *server) Run(port string) error {
 
 	}
 
+	s.router.POST("/", func(c *gin.Context) {
+		mr.ServeHTTP(c)
+	})
+
 	s.logger.Info("listening on port", zap.String("port", port))
 	return s.router.Run(fmt.Sprintf("127.0.0.1:%s", port))
 }
 
-type RegisterParty struct {
-	Address    string `json:"address"`
-	ReportedIp string `json:"ip"`
-	Port       string `json:"port"`
-	Path       string `json:"path"`
-}
-
-func (s *server) RegisterParty(_ context.Context, params *json.RawMessage) (any, error) {
-	if params == nil {
+// concurrent safe
+func (s *server) Register(_ context.Context, params *json.RawMessage) (bool, error) {
+	if len(*params) == 0 {
 		return false, fmt.Errorf("params is nil")
 	}
 
@@ -86,19 +90,50 @@ func (s *server) RegisterParty(_ context.Context, params *json.RawMessage) (any,
 		return false, err
 	}
 
-	if registerParty.Address == "" || registerParty.ReportedIp == "" || registerParty.Port == "" || registerParty.Path == "" {
-		return false, fmt.Errorf("invalid params")
+	if err := rpc.Validate(registerParty); err != nil {
+		return false, err
+	}
+
+	ip := net.ParseIP(registerParty.ReportedIp)
+	if ip == nil {
+		return false, fmt.Errorf("invalid ip address: %s", registerParty.ReportedIp)
 	}
 
 	participant := partyclient.New(registerParty.Address, registerParty.ReportedIp, registerParty.Port, registerParty.Path)
 
-	if s.peerIpList.Contains(participant) {
+	containsID := func(item, element partyclient.PartyClient) bool {
+		return item.ID() == element.ID()
+	}
+
+	if s.peerIpList.Contains(participant, containsID) {
 		return false, fmt.Errorf("address already registered")
+	}
+
+	if err := participant.Ping(); err != nil {
+		return false, err
 	}
 
 	s.peerIpList.Add(participant)
 
 	return true, nil
+}
+
+func (s *server) Health(_ context.Context, params *json.RawMessage) (any, error) {
+	health := HealthCheck{
+		Status: "ok",
+	}
+
+	return health, nil
+}
+
+func (s *server) GetParties(_ context.Context, params *json.RawMessage) (Parties, error) {
+	Parties := make(Parties)
+	for _, v := range s.peerIpList.Items {
+		id, url := v.Locate()
+		Parties[id] = url
+	}
+
+	return Parties, nil
 }
 
 func ConvertToSnakeCase(s string) string {
