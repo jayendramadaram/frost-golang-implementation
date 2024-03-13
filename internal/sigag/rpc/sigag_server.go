@@ -22,7 +22,10 @@ type server struct {
 
 type Store interface {
 	AddParticipant(RegisterParty) error
-	GetParties() (Parties, error)
+	GetParties() Parties
+	IsLocked() bool
+
+	GetEpochParties() Parties
 }
 
 func NewServer(store Store, logger *logrus.Logger) *server {
@@ -80,6 +83,11 @@ func (s *server) Run(port string) error {
 
 // concurrent safe
 func (s *server) Register(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
+
+	if s.store.IsLocked() {
+		return nil, fmt.Errorf("DKG in progress, cant accept registration ATM")
+	}
+
 	if len(*params) == 0 {
 		return nil, fmt.Errorf("params is nil")
 	}
@@ -114,9 +122,9 @@ func (s *server) Health(_ context.Context, params *json.RawMessage) (json.RawMes
 }
 
 func (s *server) GetParties(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
-	parties, err := s.store.GetParties()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(parties)
+	return json.Marshal(s.store.GetParties())
+}
+
+func (s *server) GetEpochParties(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
+	return json.Marshal(s.store.GetEpochParties())
 }

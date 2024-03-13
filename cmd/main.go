@@ -5,14 +5,30 @@ import (
 	"fmt"
 	"frost/internal/party"
 	"frost/internal/sigag"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/rosedblabs/rosedb/v2"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
 func main() {
+
+	options := rosedb.DefaultOptions
+	options.DirPath = "/tmp/root"
+	os.Remove(options.DirPath)
+
+	db, err := rosedb.Open(options)
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		_ = db.Close()
+	}()
+
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.SetLevel(logrus.InfoLevel)
@@ -28,7 +44,7 @@ func main() {
 	})
 
 	go func() {
-		if err := sigAg.StartSignatureAggregator(context.Background(), 40*time.Second); err != nil {
+		if err := sigAg.StartSignatureAggregator(context.Background(), 40*time.Second, 100*time.Second, db); err != nil {
 			logger.Error("failed to start signature aggregator", zap.Error(err))
 		}
 	}()

@@ -23,6 +23,10 @@ type server struct {
 }
 
 type Store interface {
+	Lock()
+	UnLock()
+	IsLocked() bool
+	NewEpoch(epoch uint) error
 }
 
 func NewServer(store Store, logger *logrus.Logger, SigAgClient client.SigAgClient) *server {
@@ -82,4 +86,29 @@ func (s *server) Ping(_ context.Context, _ *json.RawMessage) (json.RawMessage, e
 	return json.Marshal(PingMessage{
 		Message: "pong",
 	})
+}
+
+func (s *server) NewEpoch(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
+	if s.store.IsLocked() {
+		return nil, fmt.Errorf("Epoch Already in progress")
+	}
+
+	if len(*params) == 0 {
+		return nil, fmt.Errorf("params is nil")
+	}
+
+	var newEpoch NewEpochRequest
+	if err := json.Unmarshal(*params, &newEpoch); err != nil {
+		return nil, err
+	}
+
+	if err := rpc.Validate(newEpoch); err != nil {
+		return nil, err
+	}
+
+	if err := s.store.NewEpoch(newEpoch.Epoch); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(true)
 }

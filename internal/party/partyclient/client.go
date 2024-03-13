@@ -10,9 +10,11 @@ import (
 )
 
 type PartyClient interface {
+	ID() string
 	Ping() error
 	Locate() (string, string)
-	ID() string
+
+	NewEpoch(epoch uint) error
 }
 
 type partyclient struct {
@@ -37,6 +39,17 @@ func (c *partyclient) Locate() (string, string) {
 
 func (c *partyclient) ID() string {
 	return c.id
+}
+
+// NewEpoch implements PartyClient.
+func (c *partyclient) NewEpoch(epoch uint) error {
+	NewEpoch := rpc.NewEpochRequest{
+		Epoch: epoch,
+	}
+	if err := c.SendRequest("new_epoch", NewEpoch, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *partyclient) SendRequest(method string, params, respType interface{}) error {

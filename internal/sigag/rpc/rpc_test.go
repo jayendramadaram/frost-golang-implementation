@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"frost/internal/sigag"
 	client "frost/internal/sigag/sigagclient"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/rosedblabs/rosedb/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,11 +19,25 @@ var SigAgClient client.SigAgClient
 var _ = Describe("Rpc", Ordered, func() {
 	BeforeAll(func() {
 		go func() {
+			options := rosedb.DefaultOptions
+			options.DirPath = "/tmp/test_sigag"
+
+			// open a database
+			db, err := rosedb.Open(options)
+			if err != nil {
+				panic(err)
+			}
+
+			defer func() {
+				_ = db.Close()
+				os.Remove(options.DirPath)
+			}()
+
 			sigAg := sigag.New(sigag.Options{
 				Logger: logrus.New(),
 				Port:   "8080",
 			})
-			sigAg.StartSignatureAggregator(context.Background(), 10*time.Second)
+			sigAg.StartSignatureAggregator(context.Background(), 10*time.Second, 100*time.Second, db)
 		}()
 		time.Sleep(5 * time.Second) // await until server is up
 
