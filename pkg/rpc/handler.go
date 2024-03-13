@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler func(c context.Context, params *json.RawMessage) (any, error)
+type Handler func(c context.Context, params *json.RawMessage) (json.RawMessage, error)
 
 type methodRecord struct {
 	m sync.RWMutex
@@ -93,6 +93,7 @@ func (mr *methodRecord) ServeHTTP(c *gin.Context) {
 			c.JSON(http.StatusOK, resp)
 		}
 	}
+	c.Set("method", r[0].Method)
 	c.JSON(statusCode, resp[0])
 }
 

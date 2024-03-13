@@ -47,10 +47,10 @@ type JSONRequest struct {
 }
 
 type JSONResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	Error   *JSONError  `json:"error,omitempty"`
-	Result  any         `json:"result,omitempty"`
-	ID      interface{} `json:"id"`
+	JSONRPC string          `json:"jsonrpc"`
+	Error   *JSONError      `json:"error,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	ID      interface{}     `json:"id"`
 }
 
 func DecodeParams[T any](p json.RawMessage) (T, error) {

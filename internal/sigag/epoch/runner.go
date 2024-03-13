@@ -1,11 +1,9 @@
 package epoch
 
 import (
-	"frost/internal/party/partyclient"
-	"frost/pkg/collections"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 type Runner interface {
@@ -15,17 +13,20 @@ type Runner interface {
 type runner struct {
 	nextepoch uint
 	initTick  time.Duration
-	logger    *zap.Logger
+	logger    *logrus.Logger
 
-	peerIpList *collections.OrderedList[partyclient.PartyClient]
+	store Store
 }
 
-func NewEpochRunner(peerIpList *collections.OrderedList[partyclient.PartyClient], intialTick time.Duration, logger *zap.Logger) Runner {
+type Store interface {
+}
+
+func NewEpochRunner(store Store, intialTick time.Duration, logger *logrus.Logger) Runner {
 	return &runner{
-		peerIpList: peerIpList,
-		nextepoch:  1,
-		initTick:   intialTick,
-		logger:     logger,
+		store:     store,
+		nextepoch: 1,
+		initTick:  intialTick,
+		logger:    logger,
 	}
 }
 

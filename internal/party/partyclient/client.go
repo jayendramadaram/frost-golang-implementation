@@ -1,6 +1,13 @@
 package partyclient
 
-import "fmt"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"frost/internal/party/rpc"
+	"frost/pkg/types"
+	"net/http"
+)
 
 type PartyClient interface {
 	Ping() error
@@ -20,7 +27,8 @@ func New(id, ip, port, path string) PartyClient {
 }
 
 func (c *partyclient) Ping() error {
-	return nil
+	var PingMessage rpc.PingMessage
+	return c.SendRequest("ping", nil, PingMessage)
 }
 
 func (c *partyclient) Locate() (string, string) {
@@ -29,4 +37,50 @@ func (c *partyclient) Locate() (string, string) {
 
 func (c *partyclient) ID() string {
 	return c.id
+}
+
+func (c *partyclient) SendRequest(method string, params, respType interface{}) error {
+
+	paramsData, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	reqObject := types.JSONRequest{
+		JSONRPC: types.Version,
+		Method:  method,
+		Params:  paramsData,
+		ID:      1,
+	}
+
+	jsonData, err := json.Marshal(reqObject)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("http://%s:%s%s", c.ip, c.port, c.path)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	var response types.JSONResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("sigag: %s", response.Error.Message)
+	}
+
+	return json.Unmarshal(response.Result, &respType)
 }

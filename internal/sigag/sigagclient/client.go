@@ -4,62 +4,86 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"frost/internal/sigag/rpc"
 	"frost/pkg/types"
 	"net/http"
 )
 
 type SigAgClient interface {
-	Register() error
+	Register(id, ip, port, path string) error
+	GetParticipants() (rpc.Parties, error)
 	CheckUptime() (bool, error)
 }
 
 type client struct {
-	Ip   string
-	Port string
-	Path string
-	jwt  string
+	url string
+	jwt string
 }
 
-func New(ip, port, path string) SigAgClient {
+func New(url string) SigAgClient {
 	return &client{
-		Ip:   ip,
-		Port: port,
-		Path: path,
+		url: url,
 	}
 }
 
-func (c *client) Register() error {
+func (c *client) Register(id, ip, port, path string) error {
+	var params = rpc.RegisterParty{
+		Address:    id,
+		ReportedIp: ip,
+		Port:       port,
+		Path:       path,
+	}
+	err := c.SendRequest("register", params, nil)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (c *client) CheckUptime() (bool, error) {
-	resp, err := c.SendRequest("health", nil)
+	var reponse rpc.HealthCheck
+	err := c.SendRequest("health", nil, &reponse)
 	if err != nil {
 		return false, err
 	}
+	fmt.Printf("sigag: %s\n", reponse.Status)
 
-	health := resp.(map[string]interface{})
-	return health["status"] == "ok", nil
+	return reponse.Status == "ok", nil
 }
 
-func (c *client) SendRequest(method string, params []byte) (any, error) {
+func (c *client) GetParticipants() (rpc.Parties, error) {
+	var reponse rpc.Parties
+	err := c.SendRequest("get_parties", nil, &reponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return reponse, nil
+}
+
+func (c *client) SendRequest(method string, params, respType interface{}) error {
+
+	paramsData, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
 
 	reqObject := types.JSONRequest{
 		JSONRPC: types.Version,
 		Method:  method,
-		Params:  params,
+		Params:  paramsData,
 		ID:      1,
 	}
 
 	jsonData, err := json.Marshal(reqObject)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	url := fmt.Sprintf("http://%s:%s%s", c.Ip, c.Port, c.Path)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonData))
+	// url := fmt.Sprintf("http://%s:%s%s", c.Ip, c.Port, c.Path)
+	req, err := http.NewRequest(http.MethodPost, c.url, bytes.NewReader(jsonData))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -68,18 +92,18 @@ func (c *client) SendRequest(method string, params []byte) (any, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var response types.JSONResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, err
+		return err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("sigag: %s", response.Error.Message)
+		return fmt.Errorf("sigag: %s", response.Error.Message)
 	}
 
-	return response.Result, nil
+	return json.Unmarshal(response.Result, &respType)
 }

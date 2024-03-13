@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	client "frost/internal/sigag/sigagclient"
 	"frost/pkg/rpc"
-	"net"
 	"reflect"
 
 	"github.com/gin-contrib/cors"
@@ -17,16 +17,16 @@ import (
 type server struct {
 	logger *logrus.Logger
 	router *gin.Engine
-	store  Store
+
+	SigAgClient client.SigAgClient
+	store       Store
 }
 
 type Store interface {
-	AddParticipant(RegisterParty) error
-	GetParties() (Parties, error)
 }
 
-func NewServer(store Store, logger *logrus.Logger) *server {
-	return &server{store: store, router: gin.New(), logger: logger}
+func NewServer(store Store, logger *logrus.Logger, SigAgClient client.SigAgClient) *server {
+	return &server{store: store, router: gin.New(), logger: logger, SigAgClient: SigAgClient}
 }
 
 func (s *server) Run(port string) error {
@@ -78,45 +78,8 @@ func (s *server) Run(port string) error {
 	return s.router.Run(fmt.Sprintf("127.0.0.1:%s", port))
 }
 
-// concurrent safe
-func (s *server) Register(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
-	if len(*params) == 0 {
-		return nil, fmt.Errorf("params is nil")
-	}
-
-	var registerParty RegisterParty
-	if err := json.Unmarshal(*params, &registerParty); err != nil {
-		return nil, err
-	}
-
-	if err := rpc.Validate(registerParty); err != nil {
-		return nil, err
-	}
-
-	ip := net.ParseIP(registerParty.ReportedIp)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid ip address: %s", registerParty.ReportedIp)
-	}
-
-	if err := s.store.AddParticipant(registerParty); err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(true)
-}
-
-func (s *server) Health(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
-	health := HealthCheck{
-		Status: "ok",
-	}
-
-	return json.Marshal(health)
-}
-
-func (s *server) GetParties(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
-	parties, err := s.store.GetParties()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(parties)
+func (s *server) Ping(_ context.Context, _ *json.RawMessage) (json.RawMessage, error) {
+	return json.Marshal(PingMessage{
+		Message: "pong",
+	})
 }

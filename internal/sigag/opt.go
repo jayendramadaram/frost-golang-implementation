@@ -1,8 +1,8 @@
 package sigag
 
-import "go.uber.org/zap"
+import "github.com/sirupsen/logrus"
 
 type Options struct {
-	Logger *zap.Logger
+	Logger *logrus.Logger
 	Port   string
 }
