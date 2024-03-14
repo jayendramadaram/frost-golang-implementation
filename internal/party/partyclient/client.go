@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"frost/internal/party/rpc"
+	sigagrpc "frost/internal/sigag/rpc"
 	"frost/pkg/types"
 	"net/http"
 )
@@ -15,17 +16,22 @@ type PartyClient interface {
 	Locate() (string, string)
 
 	NewEpoch(epoch uint) error
+	DKGInit(partyMap sigagrpc.Parties, threshold uint) error
 }
 
 type partyclient struct {
-	id   string
-	ip   string
-	port string
-	path string
+	id  string
+	url string
+
+	connection string
 }
 
-func New(id, ip, port, path string) PartyClient {
-	return &partyclient{id: id, ip: ip, port: port, path: path}
+func New(id, url string, noTLS bool) PartyClient {
+	connection := "https://"
+	if noTLS {
+		connection = "http://"
+	}
+	return &partyclient{id: id, url: url, connection: connection}
 }
 
 func (c *partyclient) Ping() error {
@@ -34,7 +40,7 @@ func (c *partyclient) Ping() error {
 }
 
 func (c *partyclient) Locate() (string, string) {
-	return c.id, fmt.Sprintf("%s:%s:%s", c.ip, c.port, c.path)
+	return c.id, fmt.Sprintf("%s%s", c.connection, c.url)
 }
 
 func (c *partyclient) ID() string {
@@ -47,6 +53,17 @@ func (c *partyclient) NewEpoch(epoch uint) error {
 		Epoch: epoch,
 	}
 	if err := c.SendRequest("new_epoch", NewEpoch, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *partyclient) DKGInit(partyMap sigagrpc.Parties, threshold uint) error {
+	dkgInit := rpc.DKGInitRequest{
+		Parties:   partyMap,
+		Threshold: threshold,
+	}
+	if err := c.SendRequest("dkg_init", dkgInit, nil); err != nil {
 		return err
 	}
 	return nil
@@ -71,7 +88,7 @@ func (c *partyclient) SendRequest(method string, params, respType interface{}) e
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s:%s%s", c.ip, c.port, c.path)
+	_, url := c.Locate()
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return err

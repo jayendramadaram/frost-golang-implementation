@@ -18,23 +18,29 @@ type runner struct {
 	initTick  time.Duration
 	logger    *logrus.Logger
 
-	store Store
+	store           Store
+	thresholdFactor float64
 }
 
 type Store interface {
 	Lock()
 	UnLock()
 
-	GetPartyCLients() collections.OrderedList[partyclient.PartyClient]
 	PutParties(parties rpc.Parties) error
+	GetPartyCLients() *collections.OrderedList[partyclient.PartyClient]
+	RemoveParty(item partyclient.PartyClient) error
+
+	PutThreshold(threshold uint, epoch uint) error
 }
 
-func NewEpochRunner(store Store, intialTick time.Duration, logger *logrus.Logger) Runner {
+func NewEpochRunner(store Store, intialTick time.Duration, thresholdFactor float64, logger *logrus.Logger) Runner {
 	return &runner{
 		store:     store,
 		nextepoch: 1,
 		initTick:  intialTick,
 		logger:    logger,
+
+		thresholdFactor: thresholdFactor,
 	}
 }
 
@@ -44,15 +50,15 @@ func (r *runner) Run(epochDuration time.Duration) error {
 
 	// in a for loop with a time out of `epoch timeout` start a new epoch
 	for {
-		// lock system sigag
-		// announce new epoch
-		// ack from all parties and they lock their systems
-		// store responded parties to the db for this epoch
+		// lock system sigag ✅
+		// announce new epoch ✅
+		// ack from all parties and they lock their systems ✅
+		// store responded parties to the db for this epoch ✅
 
 		// DKG init
-		// choose n,k
-		// Round 1
-		// send list of parties[] to all parties[]
+		// choose n,k ✅
+		// Round 1 ✅
+		// send list of parties[] to all parties[] ✅
 		// parties do dkg among themselves
 		// - each party generates a polynomial using shamir secret sharing library
 		// - compute POK of secret and commitments for polynomial generated
@@ -84,6 +90,18 @@ func (r *runner) Run(epochDuration time.Duration) error {
 			return err
 		}
 
+		TotalParties := len(partyMap)
+		Threshold := uint((float64(TotalParties) / r.thresholdFactor) + 1)
+
+		if err := r.store.PutThreshold(Threshold, r.nextepoch); err != nil {
+			return err
+		}
+
+		if err := r.AnnounceDKGInit(r.store.GetPartyCLients(), partyMap, Threshold); err != nil {
+			r.logger.Errorf("failed to announce dkg init: %v", err)
+			continue
+		}
+
 		time.Sleep(epochDuration)
 		r.nextepoch++
 	}
@@ -97,14 +115,29 @@ func (r *runner) awaitInitialTick() {
 	<-time.After(r.initTick)
 }
 
-func (r *runner) AnnounceNewEpoch(parties collections.OrderedList[partyclient.PartyClient], epoch uint) (rpc.Parties, error) {
+func (r *runner) AnnounceNewEpoch(parties *collections.OrderedList[partyclient.PartyClient], epoch uint) (rpc.Parties, error) {
 	partyMap := make(rpc.Parties)
 	for _, v := range parties.Items {
 		if err := v.NewEpoch(epoch); err != nil {
-			return nil, err
+			r.logger.Errorf("failed to announce new epoch: %v", err)
+			if err := r.store.RemoveParty(v); err != nil {
+				r.logger.Errorf("failed to remove party: %v", err)
+				return nil, err
+			}
+			continue
 		}
 		id, url := v.Locate()
 		partyMap[id] = url
 	}
 	return partyMap, nil
+}
+
+func (r *runner) AnnounceDKGInit(parties *collections.OrderedList[partyclient.PartyClient], partyMap rpc.Parties, threshold uint) error {
+	for _, v := range parties.Items {
+		if err := v.DKGInit(partyMap, threshold); err != nil {
+			r.logger.Errorf("failed to announce dkg init: %v", err)
+			return err
+		}
+	}
+	return nil
 }

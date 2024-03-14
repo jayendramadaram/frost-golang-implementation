@@ -11,11 +11,39 @@ import (
 	"github.com/rosedblabs/rosedb/v2"
 )
 
+var containsID = func(item, element partyclient.PartyClient) bool {
+	return item.ID() == element.ID()
+}
+
 type store struct {
 	peerIpList *collections.OrderedList[partyclient.PartyClient]
 	locked     bool
 	mu         sync.RWMutex
 	db         *rosedb.DB
+}
+
+// PutThreshold implements Store.
+func (s *store) PutThreshold(threshold uint, epoch uint) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.db.Put([]byte(fmt.Sprintf("EPOCH_%d_THRESHOLD", epoch)), []byte(fmt.Sprintf("%d", threshold))); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveParty implements Store.
+func (s *store) RemoveParty(item partyclient.PartyClient) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.peerIpList.Remove(item, containsID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetEpochParties implements Store.
@@ -46,11 +74,11 @@ func (s *store) PutParties(parties rpc.Parties) error {
 }
 
 // GetPartyCLients implements Store.
-func (s *store) GetPartyCLients() collections.OrderedList[partyclient.PartyClient] {
+func (s *store) GetPartyCLients() *collections.OrderedList[partyclient.PartyClient] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return *s.peerIpList
+	return s.peerIpList
 }
 
 // IsLocked implements Store.
@@ -82,11 +110,7 @@ func (s *store) AddParticipant(party rpc.RegisterParty) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	participant := partyclient.New(party.Address, party.ReportedIp, party.Port, party.Path)
-
-	containsID := func(item, element partyclient.PartyClient) bool {
-		return item.ID() == element.ID()
-	}
+	participant := partyclient.New(party.Address, party.Url, party.NoTLS)
 
 	if s.peerIpList.Contains(participant, containsID) {
 		return fmt.Errorf("address already registered")

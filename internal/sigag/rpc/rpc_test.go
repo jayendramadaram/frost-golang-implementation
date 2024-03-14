@@ -37,7 +37,7 @@ var _ = Describe("Rpc", Ordered, func() {
 				Logger: logrus.New(),
 				Port:   "8080",
 			})
-			sigAg.StartSignatureAggregator(context.Background(), 10*time.Second, 100*time.Second, db)
+			sigAg.StartSignatureAggregator(context.Background(), 10*time.Second, 100*time.Second, db, 2)
 		}()
 		time.Sleep(5 * time.Second) // await until server is up
 
@@ -52,19 +52,19 @@ var _ = Describe("Rpc", Ordered, func() {
 		})
 
 		It("should be able to register", func() {
-			err := SigAgClient.Register("1", "127.0.0.1", "3", "4")
+			err := SigAgClient.Register("1", "127.0.0.1:8081", true)
 			Expect(err).To(BeNil())
 
-			err = SigAgClient.Register("2", "127.0.0.1", "5", "6")
+			err = SigAgClient.Register("2", "127.0.0.1", true)
 			Expect(err).To(BeNil())
 		})
 
 		It("should not be able to register invalid participant", func() {
-			err := SigAgClient.Register("1", "127.0.0.1", "3", "4") // same user
+			err := SigAgClient.Register("1", "127.0.0.1", true) // same user
 			Expect(err).ToNot(BeNil())
 
-			err = SigAgClient.Register("3", "127.1", "3", "4") // invalid ip
-			Expect(err).ToNot(BeNil())
+			// err = SigAgClient.Register("3", "127.1", "3", "4") // invalid ip
+			// Expect(err).ToNot(BeNil())
 		})
 
 		It("should be able to get participant list", func() {
@@ -73,8 +73,8 @@ var _ = Describe("Rpc", Ordered, func() {
 			Expect(participants).ToNot(BeNil())
 			Expect(len(participants)).To(Equal(2))
 
-			Expect(participants["1"]).To(Equal("127.0.0.1:3:4"))
-			Expect(participants["2"]).To(Equal("127.0.0.1:5:6"))
+			Expect(participants["1"]).To(Equal("127.0.0.1:8081"))
+			Expect(participants["2"]).To(Equal("127.0.0.1"))
 		})
 	})
 })

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"frost/pkg/rpc"
-	"net"
 	"reflect"
 
 	"github.com/gin-contrib/cors"
@@ -101,10 +100,10 @@ func (s *server) Register(_ context.Context, params *json.RawMessage) (json.RawM
 		return nil, err
 	}
 
-	ip := net.ParseIP(registerParty.ReportedIp)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid ip address: %s", registerParty.ReportedIp)
-	}
+	// ip := net.ParseIP(registerParty.ReportedIp)
+	// if ip == nil {
+	// 	return nil, fmt.Errorf("invalid ip address: %s", registerParty.ReportedIp)
+	// }
 
 	if err := s.store.AddParticipant(registerParty); err != nil {
 		return nil, err

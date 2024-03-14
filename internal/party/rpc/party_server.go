@@ -89,9 +89,7 @@ func (s *server) Ping(_ context.Context, _ *json.RawMessage) (json.RawMessage, e
 }
 
 func (s *server) NewEpoch(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
-	if s.store.IsLocked() {
-		return nil, fmt.Errorf("Epoch Already in progress")
-	}
+	s.store.Lock()
 
 	if len(*params) == 0 {
 		return nil, fmt.Errorf("params is nil")
@@ -107,6 +105,27 @@ func (s *server) NewEpoch(_ context.Context, params *json.RawMessage) (json.RawM
 	}
 
 	if err := s.store.NewEpoch(newEpoch.Epoch); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(true)
+}
+
+func (s *server) DkgInit(_ context.Context, params *json.RawMessage) (json.RawMessage, error) {
+	if !s.store.IsLocked() {
+		return nil, fmt.Errorf("new Epoch is not Initiated")
+	}
+
+	if len(*params) == 0 {
+		return nil, fmt.Errorf("params is nil")
+	}
+
+	var dkgInit DKGInitRequest
+	if err := json.Unmarshal(*params, &dkgInit); err != nil {
+		return nil, err
+	}
+
+	if err := rpc.Validate(dkgInit); err != nil {
 		return nil, err
 	}
 

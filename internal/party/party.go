@@ -2,6 +2,7 @@ package party
 
 import (
 	"context"
+	"fmt"
 	"frost/internal/party/rpc"
 	"frost/internal/party/store"
 	client "frost/internal/sigag/sigagclient"
@@ -10,7 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func SpinNewParty(port string, ServerUrl string, logger *logrus.Logger) error {
+func SpinNewParty(port string, ServerUrl string, noTLS bool, logger *logrus.Logger) error {
 
 	errs, _ := errgroup.WithContext(context.Background())
 
@@ -21,7 +22,7 @@ func SpinNewParty(port string, ServerUrl string, logger *logrus.Logger) error {
 		return rpc.NewServer(store, logger, SigAgClient).Run(port)
 	})
 
-	if err := SigAgClient.Register(port, "127.0.0.1", port, "/"); err != nil {
+	if err := SigAgClient.Register(port, fmt.Sprintf("127.0.0.1:%s%s", port, "/"), noTLS); err != nil {
 		return err
 	}
 

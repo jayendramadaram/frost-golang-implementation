@@ -28,7 +28,13 @@ func New(opts Options) *sigag {
 	}
 }
 
-func (s *sigag) StartSignatureAggregator(ctx context.Context, intialTick time.Duration, epochDuration time.Duration, db *rosedb.DB) error {
+func (s *sigag) StartSignatureAggregator(
+	ctx context.Context,
+	intialTick time.Duration,
+	epochDuration time.Duration,
+	db *rosedb.DB,
+	ThresholdFactor float64,
+) error {
 	errs, _ := errgroup.WithContext(ctx)
 
 	peerIpList := collections.NewOrderedList[partyclient.PartyClient]()
@@ -39,7 +45,7 @@ func (s *sigag) StartSignatureAggregator(ctx context.Context, intialTick time.Du
 		return rpc.NewServer(store, s.logger).Run(s.port)
 	})
 
-	if err := epoch.NewEpochRunner(store, intialTick, s.logger).Run(epochDuration); err != nil {
+	if err := epoch.NewEpochRunner(store, intialTick, ThresholdFactor, s.logger).Run(epochDuration); err != nil {
 		s.logger.Error("failed while running epoch", zap.Error(err))
 		return err
 	}

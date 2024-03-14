@@ -10,7 +10,7 @@ import (
 )
 
 type SigAgClient interface {
-	Register(id, ip, port, path string) error
+	Register(id, url string, noTLS bool) error
 	GetParticipants() (rpc.Parties, error)
 	CheckUptime() (bool, error)
 }
@@ -26,12 +26,11 @@ func New(url string) SigAgClient {
 	}
 }
 
-func (c *client) Register(id, ip, port, path string) error {
+func (c *client) Register(id, url string, noTLS bool) error {
 	var params = rpc.RegisterParty{
-		Address:    id,
-		ReportedIp: ip,
-		Port:       port,
-		Path:       path,
+		Address: id,
+		Url:     url,
+		NoTLS:   noTLS,
 	}
 	err := c.SendRequest("register", params, nil)
 	if err != nil {

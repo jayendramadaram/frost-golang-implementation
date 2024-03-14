@@ -49,7 +49,7 @@ func (s *store) UnLock() {
 func (s *store) NewEpoch(epoch uint) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if epoch <= s.currentEpoch {
+	if epoch <= s.currentEpoch && !s.locked {
 		return fmt.Errorf("recevied invalid epoch %s", epoch)
 	}
 	s.currentEpoch = epoch

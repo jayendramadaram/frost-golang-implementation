@@ -44,7 +44,7 @@ func main() {
 	})
 
 	go func() {
-		if err := sigAg.StartSignatureAggregator(context.Background(), 40*time.Second, 100*time.Second, db); err != nil {
+		if err := sigAg.StartSignatureAggregator(context.Background(), 40*time.Second, 100*time.Second, db, 2); err != nil {
 			logger.Error("failed to start signature aggregator", zap.Error(err))
 		}
 	}()
@@ -53,7 +53,7 @@ func main() {
 	totalNodes := 5
 	for i := 1; i <= totalNodes; i++ {
 		go func(i int) {
-			if err := party.SpinNewParty(fmt.Sprintf("880%d", i), "http://localhost:8080/", logger); err != nil {
+			if err := party.SpinNewParty(fmt.Sprintf("880%d", i), "http://localhost:8080/", true, logger); err != nil {
 				logger.Error("failed to spin new party", zap.Error(err))
 			}
 		}(i)

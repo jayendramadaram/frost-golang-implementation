@@ -39,5 +39,5 @@ func main() {
 		Logger: logger,
 		Port:   "8080",
 	})
-	sigAg.StartSignatureAggregator(context.Background(), 10*time.Second, 100*time.Second, db)
+	sigAg.StartSignatureAggregator(context.Background(), 10*time.Second, 100*time.Second, db, 2)
 }

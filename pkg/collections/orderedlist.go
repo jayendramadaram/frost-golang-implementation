@@ -1,6 +1,9 @@
 package collections
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type OrderedList[T comparable] struct {
 	Items []T
@@ -37,16 +40,18 @@ func (o *OrderedList[T]) Add(item T) {
 	o.Items = append(o.Items, item)
 }
 
-func (o *OrderedList[T]) Remove(item T, compare CompareFunc[T]) {
+func (o *OrderedList[T]) Remove(item T, compare CompareFunc[T]) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	for i, v := range o.Items {
 		if compare(item, v) {
 			o.Items = append(o.Items[:i], o.Items[i+1:]...)
-			break
+			return nil
 		}
 	}
+
+	return fmt.Errorf("item not found")
 }
 
 func (o *OrderedList[T]) RemoveAll(item T) {
